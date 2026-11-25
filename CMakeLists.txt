@@ -23,6 +23,9 @@ add_library(3dmaster_core STATIC
 
 target_compile_features(3dmaster_core PUBLIC cxx_std_17)
 
+# The Seer shell links this static library into a SHARED plugin: PIC is required on Linux
+set_target_properties(3dmaster_core PROPERTIES POSITION_INDEPENDENT_CODE ON)
+
 target_include_directories(3dmaster_core PUBLIC
     "${CMAKE_CURRENT_SOURCE_DIR}/include"
 )
