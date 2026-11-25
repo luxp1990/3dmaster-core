@@ -472,7 +472,18 @@ void MasterSidebar::setupUI() {
 }
 
 void MasterSidebar::updateModelStats(ModelDataPtr model) {
-    if (!model) return;
+    if (!model) {
+        // 清空文档或加载失败时复位侧边栏，避免残留上一个模型的信息与装配树
+        m_lblName->setText(master_i18n::tr("名称: -", "Name: -"));
+        m_lblName->setToolTip(QString());
+        m_lblFormat->setText(master_i18n::tr("格式: -", "Format: -"));
+        m_lblVerts->setText(master_i18n::tr("顶点数: -", "Vertices: -"));
+        m_lblFaces->setText(master_i18n::tr("面片数: -", "Triangles: -"));
+        m_lblSize->setText(master_i18n::tr("尺寸: -", "Size: -"));
+        m_treeAssembly->clear();
+        m_grpAssembly->setVisible(false);
+        return;
+    }
 
     QString fileName = QFileInfo(model->filePath).fileName();
     m_lblName->setText(master_i18n::tr("名称: %1", "Name: %1").arg(fileName));
