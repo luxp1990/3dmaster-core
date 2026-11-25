@@ -2125,6 +2125,7 @@ bool ModelLoaderWorker::parseGLTF(const QString& path, ModelDataPtr outModel) {
         QByteArray utf8Path = safePath.toUtf8();
         bool ok = provider.Read(TCollection_AsciiString(utf8Path.constData()), shape);
         if (!ok || shape.IsNull()) {
+            if (isCancelled()) return false;
             // 回退使用原始路径重试
             utf8Path = path.toUtf8();
             ok = provider.Read(TCollection_AsciiString(utf8Path.constData()), shape);
@@ -2271,18 +2272,19 @@ bool ModelLoaderWorker::parse3MF(const QString& path, ModelDataPtr outModel) {
         if (str.isEmpty()) return m;
         QStringList parts = str.split(' ', Qt::SkipEmptyParts);
         if (parts.size() >= 12) {
-            float m00 = parts[0].toFloat();
-            float m01 = parts[1].toFloat();
-            float m02 = parts[2].toFloat();
-            float m10 = parts[3].toFloat();
-            float m11 = parts[4].toFloat();
-            float m12 = parts[5].toFloat();
-            float m20 = parts[6].toFloat();
-            float m21 = parts[7].toFloat();
-            float m22 = parts[8].toFloat();
-            float m30 = parts[9].toFloat();
-            float m31 = parts[10].toFloat();
-            float m32 = parts[11].toFloat();
+            // B1: 与 <vertex> 坐标一致地过滤 NaN/Inf，避免畸形 transform 把渲染矩阵毒化
+            float m00 = sanitizeFloat(parts[0].toFloat());
+            float m01 = sanitizeFloat(parts[1].toFloat());
+            float m02 = sanitizeFloat(parts[2].toFloat());
+            float m10 = sanitizeFloat(parts[3].toFloat());
+            float m11 = sanitizeFloat(parts[4].toFloat());
+            float m12 = sanitizeFloat(parts[5].toFloat());
+            float m20 = sanitizeFloat(parts[6].toFloat());
+            float m21 = sanitizeFloat(parts[7].toFloat());
+            float m22 = sanitizeFloat(parts[8].toFloat());
+            float m30 = sanitizeFloat(parts[9].toFloat());
+            float m31 = sanitizeFloat(parts[10].toFloat());
+            float m32 = sanitizeFloat(parts[11].toFloat());
             m = QMatrix4x4(
                 m00, m10, m20, m30,
                 m01, m11, m21, m31,
@@ -2516,7 +2518,9 @@ bool ModelLoaderWorker::parse3MF(const QString& path, ModelDataPtr outModel) {
         std::unordered_map<EdgeKey, std::vector<QVector3D>, EdgeKeyHash> edgeMap;
         std::unordered_map<EdgeKey, std::pair<QVector3D, QVector3D>, EdgeKeyHash> edgePoints;
 
+        int triCounter = 0;
         for (const auto& tri : obj.triangles) {
+            if ((++triCounter % 20000) == 0 && isCancelled()) return false;
             if (tri.v1 < 0 || tri.v1 >= obj.vertices.size() ||
                 tri.v2 < 0 || tri.v2 >= obj.vertices.size() ||
                 tri.v3 < 0 || tri.v3 >= obj.vertices.size()) {
@@ -2591,7 +2595,9 @@ bool ModelLoaderWorker::parse3MF(const QString& path, ModelDataPtr outModel) {
         edgeMesh.isFeatureEdge = true;
         edgeMesh.prototypeId = obj.id;
 
+        int edgeCounter = 0;
         for (const auto& kv : edgeMap) {
+            if ((++edgeCounter % 20000) == 0 && isCancelled()) return false;
             const auto& normalsList = kv.second;
             bool isFeature = false;
             if (normalsList.size() == 1) {
